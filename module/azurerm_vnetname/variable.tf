@@ -1,6 +1,7 @@
-variable "azurerm_dev_vnet" {
+variable "dev_vnet" {
+    description = "define variable for dev_vnet"
     type = map(object({
-     dev_vnet_name = string
+     dev_vnetname = string
      dev_vnet_location = string
      dev_rgname = string
      dev_address_space = list(string)
