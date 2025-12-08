@@ -1,27 +1,28 @@
-variable "Parent-rg-variable" {
-  description = "define variable for rg parent module"
+variable "resource_group_m2tfvars" {
+  description = "Map of resource groups to create"
   type = map(object({
-    dev_rgname = string
+    resource_group = string
     rg_location = string
   }))
 }
 
-variable "parent-vnet-variable" {
+variable "parent-vnet-m2tfvars" {
+  description = "Map of vnet to create"
   type = map(object({
-    dev_rgname = string
-    dev_vnetname = string
-    dev_vnet_location = string
-    dev_address_space = list(string)
-    dev_dns_servers = list(string)
+    resource_group = string
+    vnet_name = string
+    vnet_location = string
+    address_space = list(string)
+    dns_servers = list(string)
   }))
 }
 
-variable "parent-subnet-variable" {
+variable "parent-subnet-m2tfvars" {
+  description = "Map of subnet to create"
   type = map(object({
-    dev_subnetname = string
-    dev_rgname = string
-    dev_vnetname = string
-    dev_address_space = list(string)
+  subnet_name = string
+   resource_group = string
+   vnet_name = string
+   address_space = list(string)
   }))
-
 }

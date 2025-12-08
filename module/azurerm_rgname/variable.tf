@@ -1,7 +1,7 @@
-variable "rg_name" {
-  description = "define variable for rg child module"
+variable "resource_group" {
+  description = "Map of resource groups to create"
   type = map(object({
-    dev_rgname = string
+    resource_group = string
     rg_location = string
   }))
 }
