@@ -26,3 +26,23 @@ variable "parent-subnet-m2tfvars" {
    address_space = list(string)
   }))
 }
+
+variable "network_interface_m2tfvars" {
+    type = map(object({
+      nic_name = string
+      nic_location = string
+      resource_group = string  
+      subnet_name = string
+      vnet_name = string 
+    }))
+}
+
+variable "virtual_machine-m2tfvars" {
+    type = map(object({
+vmname = string
+location = string
+resource_group = string
+vm_size               = string
+nic_name = string
+    }))
+}
