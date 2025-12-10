@@ -46,35 +46,34 @@ stages:
   # ----------------------------------------------------------
   # 2. Terraform FMT
   # ----------------------------------------------------------
-  - job: TerraformFmt
-    displayName: "Terraform Fmt"
-    dependsOn: Terraform_Install_Validate
-    pool: MyHost
 
-    steps:
+  steps:
     - task: TerraformTask@5
-      displayName: "Terraform Fmt"
       inputs:
         provider: 'azurerm'
         command: 'custom'
-        customCommand: 'fmt'
         workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
         outputTo: 'console'
-
+        customCommand: 'terraform fmt'
+        environmentServiceNameAzureRM: 'dev-service-connection'
   # ----------------------------------------------------------
   # 3. tfsec security scan
   # ----------------------------------------------------------
   - job: tfsec
-    displayName: "TFSec Security Scan"
-    dependsOn: TerraformFmt
-    pool: MyHost
+      displayName: "TFSec Security Scan"
+      dependsOn: TerraformFmt
+
+      pool: MyHost
 
     steps:
     - task: tfsec@1
       displayName: "Running tfsec"
       inputs:
-        version: 'v1.26.0'
-        dir: '$(System.DefaultWorkingDirectory)/env/dev'
+      version: 'v1.26.0'
+      dir: '$(System.DefaultWorkingDirectory)/env/dev'
+      # optionally add args to exclude .terraform and modules
+      args: '--exclude-path .terraform --format sarif'
+
 
   # ----------------------------------------------------------
   # 4. TFLint
