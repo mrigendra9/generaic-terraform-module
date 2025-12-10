@@ -1,0 +1,203 @@
+# Use a self-hosted agent pool
+pool: MyHost
+
+trigger: none    # No auto trigger (manual pipeline)
+
+# ============================================================
+# STAGE 1 — PRE-COMMIT / STATIC ANALYSIS
+# ============================================================
+stages:
+- stage: PreCommit
+  displayName: "Pre-Commit / Static Analysis Stage"
+
+  jobs:
+
+  # ----------------------------------------------------------
+  # 1. Terraform Install + Init + Validate
+  # ----------------------------------------------------------
+  - job: Terraform_Install_Validate
+    displayName: "Terraform Install & Validate"
+    pool: MyHost
+
+    steps:
+    - task: TerraformInstaller@1
+      displayName: "Install Terraform"
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Init"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        backendServiceArm: 'dev-service-connection'
+        backendAzureRmStorageAccountName: 'kumamrig1234567890'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Validate"
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+
+  # ----------------------------------------------------------
+  # 2. Terraform FMT
+  # ----------------------------------------------------------
+  - job: TerraformFmt
+    displayName: "Terraform Fmt"
+    dependsOn: Terraform_Install_Validate
+    pool: MyHost
+
+    steps:
+    - task: TerraformTask@5
+      displayName: "Terraform Fmt"
+      inputs:
+        provider: 'azurerm'
+        command: 'custom'
+        customCommand: 'fmt'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        outputTo: 'console'
+
+  # ----------------------------------------------------------
+  # 3. tfsec security scan
+  # ----------------------------------------------------------
+  - job: tfsec
+    displayName: "TFSec Security Scan"
+    dependsOn: TerraformFmt
+    pool: MyHost
+
+    steps:
+    - task: tfsec@1
+      displayName: "Running tfsec"
+      inputs:
+        version: 'v1.26.0'
+        dir: '$(System.DefaultWorkingDirectory)/env/dev'
+
+  # ----------------------------------------------------------
+  # 4. TFLint
+  # ----------------------------------------------------------
+  - job: tflint
+    displayName: "Terraform Linting (tflint)"
+    dependsOn: tfsec
+    pool: MyHost
+
+    steps:
+    - task: PowerShell@2
+      displayName: "Install & Run TFLint"
+      continueOnError: true
+      inputs:
+        targetType: 'inline'
+        script: |
+          winget install TerraformLinters.tflint
+          tflint
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+
+
+# ============================================================
+# STAGE 2 — COST ESTIMATION
+# ============================================================
+- stage: costStage
+  displayName: "Cost & Impact Assessment Stage"
+  dependsOn: PreCommit
+
+  jobs:
+  - job: InfraCost
+    displayName: "InfraCost Breakdown"
+    pool: MyHost
+
+    steps:
+    - task: PowerShell@2
+      displayName: "Run Infracost Breakdown"
+      inputs:
+        targetType: 'inline'
+        script: "infracost breakdown --path=."
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+
+
+# ============================================================
+# STAGE 3 — PLAN
+# ============================================================
+- stage: plan
+  displayName: "Plan & Review Stage"
+  dependsOn: costStage
+
+  jobs:
+  - job: TerraformPlan
+    displayName: "Terraform Plan"
+    pool: MyHost
+
+    steps:
+    - task: TerraformTask@5
+      displayName: "Terraform Init"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        backendServiceArm: 'dev-service-connection'
+        backendAzureRmStorageAccountName: 'kumamrig1234567890'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Plan"
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        environmentServiceNameAzureRM: 'dev-service-connection'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+
+
+# ============================================================
+# STAGE 4 — MANUAL APPROVAL
+# ============================================================
+- stage: approval
+  displayName: "Approval & Governance Stage"
+  dependsOn: plan
+
+  jobs:
+  - job: ManualApproval
+    displayName: "Manual Approval"
+    pool: server     # REQUIRED for ManualValidation task
+
+    steps:
+    - task: ManualValidation@1
+      name: manualGate
+      inputs:
+        notifyUsers: 'falana@gmail.com'
+        instructions: 'Please review the Terraform Plan before approval.'
+
+
+# ============================================================
+# STAGE 5 — APPLY
+# ============================================================
+- stage: apply
+  displayName: "Deploy / Apply Stage"
+  dependsOn: approval
+
+  jobs:
+  - job: TerraformApply
+    displayName: "Terraform Apply"
+    pool: MyHost
+
+    steps:
+    - task: TerraformTask@5
+      displayName: "Terraform Init"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        backendServiceArm: 'dev-service-connection'
+        backendAzureRmStorageAccountName: 'kumamrig1234567890'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Apply"
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        environmentServiceNameAzureRM: 'dev-service-connection'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
