@@ -1,6 +1,6 @@
 trigger: none
 
-pool: MyHost
+pool: Hosted-Agent
 
 variables:
   TF_PATH: "C:\\ProgramData\\chocolatey\\bin"
@@ -19,7 +19,7 @@ stages:
   # ----------------------------------------------------------
   - job: Terraform_Install_Validate
     displayName: "Terraform Install & Validate"
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -56,7 +56,7 @@ stages:
   # ----------------------------------------------------------
   - job: TerraformFmt
     displayName: "Terraform FMT"
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -81,7 +81,7 @@ stages:
   - job: tfsec
     displayName: "TFSec Security Scan"
     dependsOn: TerraformFmt
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -101,7 +101,7 @@ stages:
   - job: tflint
     displayName: "Terraform Linting (tflint)"
     dependsOn: tfsec
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -129,7 +129,7 @@ stages:
 
   - job: InfraCost
     displayName: "InfraCost Breakdown"
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -154,7 +154,7 @@ stages:
 
   - job: TerraformPlan
     displayName: "Terraform Plan"
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
@@ -211,7 +211,7 @@ stages:
 
   - job: TerraformApply
     displayName: "Terraform Apply"
-    pool: MyHost
+    pool: Hosted-Agent
     steps:
 
     - powershell: |
