@@ -2,36 +2,21 @@ trigger: none
 
 pool: Hosted-Agent
 
-variables:
-  TF_PATH: "C:\\ProgramData\\chocolatey\\bin"
-
 stages:
-
-# ============================================================
-# STAGE 1 — PRE-COMMIT / STATIC ANALYSIS
-# ============================================================
+# ----------------------------------------------------------
+# Stage 1: Pre-Commit / Static Analysis
+# ----------------------------------------------------------
 - stage: PreCommit
   displayName: "Pre-Commit / Static Analysis Stage"
   jobs:
-
-  # ----------------------------------------------------------
-  # 1. Terraform Install + Init + Validate
-  # ----------------------------------------------------------
   - job: Terraform_Install_Validate
     displayName: "Terraform Install & Validate"
     pool: Hosted-Agent
     steps:
-
-    - powershell: |
-        Write-Host "Adding Terraform PATH..."
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-        terraform -version
-      displayName: "Fix Terraform PATH"
-
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
-        terraformVersion: '1.6.2'
+        terraformVersion: 'latest'
 
     - task: TerraformTask@5
       displayName: "Terraform Init"
@@ -51,115 +36,18 @@ stages:
         command: 'validate'
         workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
 
-  # ----------------------------------------------------------
-  # 2. Terraform FMT
-  # ----------------------------------------------------------
-  - job: TerraformFmt
-    displayName: "Terraform FMT"
-    pool: Hosted-Agent
-    steps:
 
-    - powershell: |
-        Write-Host "Adding Terraform PATH..."
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-        terraform -version
-      displayName: "Fix Terraform PATH"
-
-    - task: TerraformTask@5
-      displayName: "Terraform Fmt"
-      inputs:
-        provider: 'azurerm'
-        command: 'custom'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-        customCommand: 'terraform fmt'
-        outputTo: 'console'
-        environmentServiceNameAzureRM: 'dev-service-connection'
-
-  # ----------------------------------------------------------
-  # 3. tfsec security scan
-  # ----------------------------------------------------------
-  - job: tfsec
-    displayName: "TFSec Security Scan"
-    dependsOn: TerraformFmt
-    pool: Hosted-Agent
-    steps:
-
-    - powershell: |
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-      displayName: "Fix Terraform PATH"
-
-    - task: tfsec@1
-      displayName: "Running tfsec"
-      inputs:
-        version: 'v1.26.0'
-        dir: '$(System.DefaultWorkingDirectory)/env/dev'
-        args: '--exclude-path .terraform --format sarif'
-
-  # ----------------------------------------------------------
-  # 4. TFLint
-  # ----------------------------------------------------------
-  - job: tflint
-    displayName: "Terraform Linting (tflint)"
-    dependsOn: tfsec
-    pool: Hosted-Agent
-    steps:
-
-    - powershell: |
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-      displayName: "Fix Terraform PATH"
-
-    - task: PowerShell@2
-      displayName: "Install & Run TFLint"
-      continueOnError: true
-      inputs:
-        targetType: 'inline'
-        script: |
-          winget install TerraformLinters.tflint
-          tflint
-        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-
-
-# ============================================================
-# STAGE 2 — COST ESTIMATION
-# ============================================================
-- stage: costStage
-  displayName: "Cost & Impact Assessment Stage"
-  dependsOn: PreCommit
-  jobs:
-
-  - job: InfraCost
-    displayName: "InfraCost Breakdown"
-    pool: Hosted-Agent
-    steps:
-
-    - powershell: |
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-      displayName: "Fix Terraform PATH"
-
-    - task: PowerShell@2
-      displayName: "Run Infracost Breakdown"
-      inputs:
-        targetType: 'inline'
-        script: "infracost breakdown --path=."
-        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-
-
-# ============================================================
-# STAGE 3 — PLAN
-# ============================================================
+# ----------------------------------------------------------
+# Stage 2: Terraform Plan
+# ----------------------------------------------------------
 - stage: plan
   displayName: "Plan & Review Stage"
-  dependsOn: costStage
+  dependsOn: PreCommit
   jobs:
-
   - job: TerraformPlan
     displayName: "Terraform Plan"
     pool: Hosted-Agent
     steps:
-
-    - powershell: |
-        $env:PATH = "$(TF_PATH);" + $env:PATH
-      displayName: "Fix Terraform PATH"
 
     - task: TerraformTask@5
       displayName: "Terraform Init"
@@ -181,14 +69,13 @@ stages:
         workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
 
 
-# ============================================================
-# STAGE 4 — MANUAL APPROVAL
-# ============================================================
+# ----------------------------------------------------------
+# Stage 3: Manual Approval
+# ----------------------------------------------------------
 - stage: approval
   displayName: "Approval & Governance Stage"
   dependsOn: plan
   jobs:
-
   - job: ManualApproval
     displayName: "Manual Approval"
     pool: server
@@ -197,18 +84,17 @@ stages:
     - task: ManualValidation@1
       name: manualGate
       inputs:
-        notifyUsers: 'falana@gmail.com'
+        notifyUsers: 'mritendra.k@gmail.com'
         instructions: 'Please review the Terraform Plan before approval.'
 
 
-# ============================================================
-# STAGE 5 — APPLY
-# ============================================================
+# ----------------------------------------------------------
+# Stage 4: Terraform Apply
+# ----------------------------------------------------------
 - stage: apply
   displayName: "Deploy / Apply Stage"
   dependsOn: approval
   jobs:
-
   - job: TerraformApply
     displayName: "Terraform Apply"
     pool: Hosted-Agent
